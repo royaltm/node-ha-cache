@@ -1,0 +1,200 @@
+Distributed JIT Cache
+=====================
+
+Assumptions
+-----------
+
+- number of cache entries are handfull (<~ 1000)
+- cache expire time is much longer than average source retrieval time
+- source retrieval time is significant (many seconds)
+- we want to avoid parallel retrieval of the same entry from the source
+- retrieval between peers is much much faster than from the source
+- stale but quick responses to clients are better than the slow ones
+
+Solution
+--------
+
+- entries are lazily distributed
+- every new/fresh entry retrieval will be negotiated (elected)
+- peers respond with a local copy of an entry or retrieve a copy from peers or/and trigger source retrieval election
+- eventually every peer will have copies of all cache entries at some point in time
+- cache expire time is set up front (before retrieval)
+- if there are no entry and no consesus for a specific timeout, fall back to the local source retrieval (worst case scenario, might allow parallel retrieval of the same source)
+
+Implementation
+--------------
+
+- announcements are one-way
+- questions are rpc (repeated after 100ms without answer for a peer)
+- answers
+- entry requests (one-way, await announcement indefinitely)
+
+entry
+
+- key
+- data
+- expire
+- term
+
+*******************************************************
+peer is a server, it responds to client requests via net or library call
+peer may ask fellow peers for a fresher copy
+peer has persistent storage (level db, redis, whatever)
+clients may also cache responses
+any peer may be asked by client and should respond
+only master may "generate" and distribute entry (generation is stateless)
+master is an efemeral entity it doesn't have cache it only receives data from source and annouces it to peers
+
+
+finite state machine (key scoped, volatile except term)
+
+1. idle (has value, no value or nobody cares) - on receiving value (or finishing sourcing it, eighther with value or no value - failure)
+
+2. candidate - on client request or peer question (candidate must be appointed, on timeout become candidate)
+
+attributes: term, entry, votes, aborted
+
+3. follower - when we know someone is sourcing or we just gave our vote
+
+attributes: term, entry, peer, isSourcing
+
+4. soucerer - when, well, sourcing
+
+attributes: term, entry
+
+
+state sourcing should timeout after 2000ms once in 1000ms sourcerer should send announcement to all
+after it times out, go back to idle
+
+term persistent
+
+responses to client on key request:
+
+- try again (after some min timeout - 300ms) client timeouts after 600ms and goes asking someone else
+- value
+
+
+QUESTION (ANSWER)
+ANSWER
+ENTRYREQ (ANNOUNCE)
+ANNOUNCE
+UPDATE
+PING (PONG)
+PONG
+
+0. timeout
+
+0.1 "candidate"
+
+- no majority answers received, enter partitioned state, key state set to "idle" (deny clients) - repeat * heartbeats on 2000ms intervals, until majority received, then resume client requests
+- majority answers received but disagreed, ++term and go another round
+
+0.2 "follower"
+
+- drop back to idle
+
+
+
+1. on QUESTION
+
+1.1 state "idle"
+
+set state to "folower" only when agreed (300 ms timeout)
+
+- check value expiration respond with ANSWER (update term if needed) with expire (0 no entry)
+- agree if expire < now && term in Q >= ours set source as peer candidate
+- else disagree
+
+1.2 state "follower" (we now know we don't have a fresh entry)
+
+- respond with ANSWER (update term if needed) with expire (0 no entry)
+- disagree if our candidate is now a sourcerer
+- agree if term in Q == ours and the candidate is the same
+- agree if term in Q > ours and change candidate
+
+refresh timeout only if agreed (300 ms)
+
+1.3 state "candidate"
+
+- if term <= ours respond with ANSWER with expire (0 no entry) and disagree
+- if term > ours respond with ANSWER with expire (0 no entry) and agree, set peer, convert to follower (300 ms timeout), update term
+
+1.4 state "sourcing"
+
+- respond with ANNOUNCEMENT
+
+
+2. on UPDATE
+
+If expire > current expire save value.
+If expire > now, except in "sourcing" state, drop to idle.
+Update term (if > ours).
+Respond to clients.
+
+3. on ANNOUNCEMENT
+
+3.1 if expire > our entry.expire send ENTRYREQ
+
+3.2 state "sourcing" ignore
+
+3.3 state "follower" with the same peer and sourcing, just refresh timeout
+
+3.4 if term >= our term, or state "idle" set state to "follower", update term if needed, set peer, set isSourcing to true, timeout (2000 ms)
+
+
+
+4. on ENTRYREQ
+
+if entry has value send UPDATE with value to source of ENTRYREQ
+
+5. on ANSWER
+
+5.1 state "follower" or "idle" or "sourcing" -> ignore
+5.2 state "candidate"
+
+- if answer expire > now send ENTRYREQ, update term if > ours, abort current voting and set new timeout (150 - 300 ms)
+- if answer term < our, ignore (but count toward partitioning)
+- else if answer term > our, update our term, abort current voting and let it timeout to go another round
+- else if majority agrees convert to "sourcing", start sourcing, start sending ANNOUNCEMENTs without value on 1000ms interval
+
+6. on PING
+
+- reply with PONG
+
+7. on PING
+
+- if we are in partitioned state count toward majority
+
+8. on CLIENT REQUEST
+
+- check value, send what we have or save for later reponse
+- on timeout send REFRESH so client would wait for more (TODO)
+- if entry is fresh just finish
+
+1.1 state "idle"
+
+- set state to "candidate" (timeout 150 - 300 ms) RPC timeout (100 ms)
+- send QUESTION to * (repeat question after RPC timeout to remaining peers or all if no answers)
+
+1.2 state "follower" or "sourcing"
+
+- do nothing
+
+
+PARTITIONED STATE
+
+
+- ok state
+- partition state (respond immediately with eagain)
+
+entering partition state:
+
+when question has not received majority's answers and times out
+
+
+
+TODO:
+
+- some basic security
+
+

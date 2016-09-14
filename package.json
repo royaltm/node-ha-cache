@@ -1,0 +1,32 @@
+{
+  "name": "node-ha-cache",
+  "version": "0.0.1",
+  "description": "High Availability Distributed JIT Cache",
+  "main": "index.js",
+  "scripts": {
+    "test": "tap test/test*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/royaltm/node-ha-cache.git"
+  },
+  "keywords": [
+    "cache",
+    "ha"
+  ],
+  "author": "Rafal Michalski <royal@yeondir.com>",
+  "license": "LGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/royaltm/node-ha-cache/issues"
+  },
+  "homepage": "https://github.com/royaltm/node-ha-cache#readme",
+  "dependencies": {
+    "colors": "^1.1.2",
+    "debug": "^2.2.0",
+    "msgpack-lite": "^0.1.20",
+    "zmq": "^2.15.3"
+  },
+  "devDependencies": {
+    "tap": "^7.1.2"
+  }
+}
