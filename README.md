@@ -1,5 +1,5 @@
-Distributed JIT Cache
-=====================
+HA Distributed JIT Cache
+========================
 
 Assumptions
 -----------
@@ -8,7 +8,7 @@ Assumptions
 - cache expire time is much longer than average source retrieval time
 - source retrieval time is significant (many seconds)
 - we want to avoid parallel retrieval of the same entry from the source
-- retrieval between peers is much much faster than from the source
+- entry retrieval between peers is much much faster than from the source
 - stale but quick responses to clients are better than the slow ones
 
 Solution
@@ -19,34 +19,55 @@ Solution
 - peers respond with a local copy of an entry or retrieve a copy from peers or/and trigger source retrieval election
 - eventually every peer will have copies of all cache entries at some point in time
 - cache expire time is set up front (before retrieval)
-- if there are no entry and no consesus for a specific timeout, fall back to the local source retrieval (worst case scenario, might allow parallel retrieval of the same source)
 
 Implementation
 --------------
 
-- announcements are one-way
-- questions are rpc (repeated after 100ms without answer for a peer)
-- answers
-- entry requests (one-way, await announcement indefinitely)
 
-entry
+### Cache
+
+Each cache entry consists of:
 
 - key
 - data
-- expire
-- term
+- expire {number}
+- term {number}
 
-*******************************************************
-peer is a server, it responds to client requests via net or library call
-peer may ask fellow peers for a fresher copy
-peer has persistent storage (level db, redis, whatever)
-clients may also cache responses
-any peer may be asked by client and should respond
-only master may "generate" and distribute entry (generation is stateless)
-master is an efemeral entity it doesn't have cache it only receives data from source and annouces it to peers
+### Messages
+
+Peer-peer messages:
+
+Every message consists of the following frames:
+
+- target: "*" or target url
+- sender: sender's url
+- type: message type + authorization
+
+and additional tail frames, depending on `type` of the message.
+
+Types:
+
+- QUESTION: tail frames: `key` and `term`
+- ANSWER: tail frames: `key`, `term`, `expiration` and `vote`
+- ENTRYREQ: expects UPDATE, attributes: `key`
+- UPDATE: attributes: `key`, `term`, `expiration`, `value`
+- ANNOUNCE: attributes: `key`, `term`, `expiration`
+- PING: expects PONG
+- PONG
+
+data types:
+
+- `key`: binary
+- `term`: variable unsigned integer LSByte first
+- `expiration`: variable unsigned integer LSByte first
+- `vote`: empty frame: false, on non-zero byte: true
+- `value`: binary
 
 
-finite state machine (key scoped, volatile except term)
+### Finite state machine
+
+- key scoped
+- state is volatile except term
 
 1. idle (has value, no value or nobody cares) - on receiving value (or finishing sourcing it, eighther with value or no value - failure)
 
