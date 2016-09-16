@@ -66,22 +66,18 @@ data types:
 
 ### Finite state machine
 
-- key scoped
+- state is key scoped
 - state is volatile except term
 
-1. idle (has value, no value or nobody cares) - on receiving value (or finishing sourcing it, eighther with value or no value - failure)
+List of possible states for each key:
 
-2. candidate - on client request or peer question (candidate must be appointed, on timeout become candidate)
-
-attributes: term, entry, votes, aborted
-
-3. follower - when we know someone is sourcing or we just gave our vote
-
-attributes: term, entry, peer, isSourcing
-
-4. soucerer - when, well, sourcing
-
-attributes: term, entry
+- "idle": fresh key in storage or default for non-existent entries
+- "follower": has voted for other candidate or follows current sourcing peer
+  attributes: `term`, `entry`, `peer`, `isSourcing`
+- "candidate": peer candidates for sourcing an entry
+  attributes: `term`, `entry`, `votes`, `aborted`
+- "sourcing": peer is currently retrieving entry from source
+  attributes: `term`, `entry`
 
 
 state sourcing should timeout after 2000ms once in 1000ms sourcerer should send announcement to all
@@ -95,111 +91,106 @@ responses to client on key request:
 - value
 
 
-QUESTION (ANSWER)
-ANSWER
-ENTRYREQ (ANNOUNCE)
-ANNOUNCE
-UPDATE
-PING (PONG)
-PONG
+#### 1. Timeouts
 
-0. timeout
-
-0.1 "candidate"
+1.1 "candidate"
 
 - no majority answers received, enter partitioned state, key state set to "idle" (deny clients) - repeat * heartbeats on 2000ms intervals, until majority received, then resume client requests
-- majority answers received but disagreed, ++term and go another round
+- majority answers received but disagreed, increase term and go ask another QUESTION
 
-0.2 "follower"
+1.2 "follower"
 
-- drop back to idle
+- drop back to "idle"
 
 
+#### 2. on CLIENT REQUEST
 
-1. on QUESTION
+on CLIENT_REQ_REFRESH_INTERVAL timeout send keep-alive to clients awaiting response
 
-1.1 state "idle"
+2.1 check local copy of entry at key
+- send immediate response if value for a requested key exists and do not save request
+- otherwise save request for later and send first keepalive message to client
+- if entry is fresh finish processing.
 
-set state to "folower" only when agreed (300 ms timeout)
+2.2 state "idle"
 
-- check value expiration respond with ANSWER (update term if needed) with expire (0 no entry)
-- agree if expire < now && term in Q >= ours set source as peer candidate
-- else disagree
+- set state to "candidate" (random timeout 150 - 300 ms) RPC timeout (100 ms)
+- send QUESTION to EVERYONE (repeat question after RPC timeout to peers that we didn't receive ANSWER from)
 
-1.2 state "follower" (we now know we don't have a fresh entry)
+2.3 state "follower" or "sourcing"
 
-- respond with ANSWER (update term if needed) with expire (0 no entry)
-- disagree if our candidate is now a sourcerer
-- agree if term in Q == ours and the candidate is the same
-- agree if term in Q > ours and change candidate
+- do nothing
 
-refresh timeout only if agreed (300 ms)
+#### 3. on QUESTION
 
-1.3 state "candidate"
+3.1 state "idle"
 
-- if term <= ours respond with ANSWER with expire (0 no entry) and disagree
-- if term > ours respond with ANSWER with expire (0 no entry) and agree, set peer, convert to follower (300 ms timeout), update term
+- vote yes if our entry's expiration is not fresh and term in QUESTION >= our entry's term; set follower state with QUESTION sender as peer candidate (300 ms timeout)
+- else vote no
+- update term of our entry if needed
+- always respond with an ANSWER
 
-1.4 state "sourcing"
+3.2 state "follower" (we know already we don't have a fresh entry)
+
+- vote no if we follow sourcing peer
+- vote yes if the term in QUESTION == our entry's term and our candidate is the same as in the QUESTION
+- vote yes if the term in QUESTION > our entry's term and change candidate to the QUESTION sender
+- refresh state timeout if voted yes (300 ms)
+- update term if needed
+- always respond with an ANSWER
+
+3.3 state "candidate"
+
+- if the term in QUESTION <= our entry's term vote no
+- if the term in QUESTION > our entry's term vote yes; convert to "follower" (300 ms timeout) set candidate to the QUESTION sender
+- update term if needed
+- always respond with ANSWER
+
+3.4 state "sourcing"
 
 - respond with ANNOUNCEMENT
 
+#### 4. on UPDATE
 
-2. on UPDATE
+- if UPDATE expiration > current entry's expiration, save value and expiration from UPDATE
+- if expiration > now (in the future) and state is not "sourcing", drop to idle
+- ipdate entry's term if needed
+- respond to clients.
 
-If expire > current expire save value.
-If expire > now, except in "sourcing" state, drop to idle.
-Update term (if > ours).
-Respond to clients.
+#### 5. on ANNOUNCEMENT
 
-3. on ANNOUNCEMENT
+5.1 if ANNOUNCEMENT's entry expiration > our entry's send ENTRYREQ
 
-3.1 if expire > our entry.expire send ENTRYREQ
+5.2 depending on current state
 
-3.2 state "sourcing" ignore
-
-3.3 state "follower" with the same peer and sourcing, just refresh timeout
-
-3.4 if term >= our term, or state "idle" set state to "follower", update term if needed, set peer, set isSourcing to true, timeout (2000 ms)
-
+- on state "sourcing", finish processing.
+- on state "follower" with the same peer as sourcing, refresh timeout (2000 ms)
+- otherwise if ANNOUNCEMENT's term >= our entry's, or state is "idle", set state to "follower", set peer, set isSourcing to true, timeout (2000 ms)
+- update term if needed
 
 
-4. on ENTRYREQ
+### 6. on ENTRYREQ
 
-if entry has value send UPDATE with value to source of ENTRYREQ
+- if our entry has value send UPDATE with value, term and expiration to sender of ENTRYREQ
 
-5. on ANSWER
+### 7. on ANSWER
 
-5.1 state "follower" or "idle" or "sourcing" -> ignore
-5.2 state "candidate"
+7.1 state "candidate"
 
-- if answer expire > now send ENTRYREQ, update term if > ours, abort current voting and set new timeout (150 - 300 ms)
-- if answer term < our, ignore (but count toward partitioning)
-- else if answer term > our, update our term, abort current voting and let it timeout to go another round
-- else if majority agrees convert to "sourcing", start sourcing, start sending ANNOUNCEMENTs without value on 1000ms interval
+- if ANSWER's expiration > now send ENTRYREQ to the ANSWER's sender, update term if needed, abort current voting and set new timeout (150 - 300 ms)
+- if ANSWER's term < ours, do not check vote (but count vote toward network partitioning check), finish processing
+- otherwise if ANSWER's term > ours, update our term, abort current voting and let it timeout to go with another election, finish processing
+- otherwise check vote if majority agreed convert to "sourcing", start sourcing, start sending ANNOUNCEMENTs (on 1000ms interval)
 
-6. on PING
+7.2 state "follower" or "idle" or "sourcing" finish processing.
+
+### 8. on PING
 
 - reply with PONG
 
-7. on PING
+### 9. on PING
 
 - if we are in partitioned state count toward majority
-
-8. on CLIENT REQUEST
-
-- check value, send what we have or save for later reponse
-- on timeout send REFRESH so client would wait for more (TODO)
-- if entry is fresh just finish
-
-1.1 state "idle"
-
-- set state to "candidate" (timeout 150 - 300 ms) RPC timeout (100 ms)
-- send QUESTION to * (repeat question after RPC timeout to remaining peers or all if no answers)
-
-1.2 state "follower" or "sourcing"
-
-- do nothing
 
 
 PARTITIONED STATE
@@ -216,6 +207,8 @@ when question has not received majority's answers and times out
 
 TODO:
 
+- handle partitioned state
 - some basic security
+- storage: separate values from metadata
 
 

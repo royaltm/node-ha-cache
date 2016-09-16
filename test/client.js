@@ -36,8 +36,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
         console.log('key: %s', key);
         times = (times >>> 0) || 1;
         while(times-- > 0) {
-          client.get(key).then(value => {
-            console.log('got: %s: %d', key, value.length);
+          client.get(key).then(entry => {
+            console.log('got: "%s" data: %d exp: %d', key, entry.value.length, entry.expire);
           })
           .catch(err => {
             console.log(colors.red('error: %s: %s'), key, err);
