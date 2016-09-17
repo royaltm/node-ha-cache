@@ -30,7 +30,8 @@ function source(keystr) {
 
 dns.lookup(os.hostname(), (err, address, family) => {
   assert.ifError(err);
-  hosts.unshift(family == 4 ? address : `[${address}]`);
+  var addr = family == 4 ? address : `[${address}]`;
+  if (hosts.length === 0) hosts.unshift(addr);
   var peers = [];
   for(let host of hosts) {
     let hostpeers = new Array(numpeers)
@@ -38,6 +39,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
       id: String(100 + i).substr(1),
       url: `tcp://${host}:${port + i}`,
       api: `tcp://${host}:${port + 1000 + i}`
+      bindUrl: `tcp://${addr}:${port + i}`,
+      bindApi: `tcp://${addr}:${port + 1000 + i}`,
     }
     peers.push(...hostpeers);
   }
@@ -61,7 +64,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
         peersmap.set(peer.id, peer);
         peerurltoid.set(peer.url, peer.id);
         console.log('forking: %s: %s', peer.id, peer.url);
-        peer.worker = cluster.fork({URL: peer.url, API: peer.api});
+        peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi});
       }, i*initialDelay);
       // freepeers.push(...peers.slice(1));
       // break;
@@ -252,6 +255,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
       peers: peers,
       url: process.env.URL,
       api: process.env.API,
+      bindUrl: process.env.BIND_URL,
+      bindApi: process.env.BIND_API,
       storage: new Storage(),
       source: source
     });
