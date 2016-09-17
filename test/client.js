@@ -8,14 +8,22 @@ const colors = require('colors/safe');
 const port = +process.env.PORT || 11000;
 const numpeers = process.argv[2]>>>0 || 1;
 
+const hosts = [];
+for(let arg of process.argv.slice(3)) hosts.push(arg);
+
 const CacheClient = require('../lib/cache_client');
 
 dns.lookup(os.hostname(), (err, address, family) => {
   assert.ifError(err);
-  const host = family == 4 ? address : `[${address}]`;
-  var peers = Array(numpeers);
-  for(var i = peers.length; i-- > 0; ) peers[i] = `tcp://${host}:${port + 1000 + i}`;
+  if (hosts.length === 0) hosts.unshift(family == 4 ? address : `[${address}]`);
+  var peers = [];
+  for(let host of hosts) {
+    let hostpeers = new Array(numpeers);
+    for(let i = hostpeers.length; i-- > 0; ) hostpeers[i] = `tcp://${host}:${port + 1000 + i}`;
+    peers.push(...hostpeers);
+  }
   var client = new CacheClient(peers, 50000);
+  process.stdout.write(peers.map(url => colors.magenta(url)).join("\n") + "\n");
 
   const readline = require('readline');
 

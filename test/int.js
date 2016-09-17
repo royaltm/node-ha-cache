@@ -15,7 +15,8 @@ const pid = process.pid;
 const port = +process.env.PORT || 11000;
 const numpeers = process.argv[2]>>>0 || 1;
 const initialDelay = process.argv[3]>>>0;
-const peers = new Array(numpeers);
+const hosts = [];
+for(let arg of process.argv.slice(3)) hosts.push(arg);
 
 function source(keystr) {
   process.send({text: `${pid}: source: ${keystr}`});
@@ -29,11 +30,16 @@ function source(keystr) {
 
 dns.lookup(os.hostname(), (err, address, family) => {
   assert.ifError(err);
-  const host = family == 4 ? address : `[${address}]`;
-  for(var i = peers.length; i-- > 0; ) peers[i] = {
-    id: String(100 + i).substr(1),
-    url: `tcp://${host}:${port + i}`,
-    api: `tcp://${host}:${port + 1000 + i}`
+  hosts.unshift(family == 4 ? address : `[${address}]`);
+  var peers = [];
+  for(let host of hosts) {
+    let hostpeers = new Array(numpeers)
+    for(let i = hostpeers.length; i-- > 0; ) hostpeers[i] = {
+      id: String(100 + i).substr(1),
+      url: `tcp://${host}:${port + i}`,
+      api: `tcp://${host}:${port + 1000 + i}`
+    }
+    peers.push(...hostpeers);
   }
 
   if (cluster.isMaster) {
@@ -50,7 +56,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
     const peersmap = new Map();
     const peerurltoid = new Map();
     const freepeers = [];
-    for (let [i, peer] of shuffle(peers).entries()) {
+    for (let [i, peer] of shuffle(peers.slice(0, numpeers)).entries()) {
       setTimeout(() => {
         peersmap.set(peer.id, peer);
         peerurltoid.set(peer.url, peer.id);
