@@ -111,7 +111,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
                 do {
                   let peer = sample(freepeers);
                   console.log('forking: %s: %s', peer.id, peer.url);
-                  peer.worker = cluster.fork({URL: peer.url, API: peer.api});
+                  peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi});
                   peersmap.set(peer.id, peer);
                 } while(count > peersmap.size);
               }
@@ -156,7 +156,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
             let peer = freepeers.shift();
             if (peer) {
               console.log('forking: %s: %s', peer.id, peer.url);
-              peer.worker = cluster.fork({URL: peer.url, API: peer.api});
+              peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi});
               peersmap.set(peer.id, peer);
             }
           }
