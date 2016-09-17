@@ -38,7 +38,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
     for(let i = hostpeers.length; i-- > 0; ) hostpeers[i] = {
       id: String(100 + i).substr(1),
       url: `tcp://${host}:${port + i}`,
-      api: `tcp://${host}:${port + 1000 + i}`
+      api: `tcp://${host}:${port + 1000 + i}`,
       bindUrl: `tcp://${addr}:${port + i}`,
       bindApi: `tcp://${addr}:${port + 1000 + i}`,
     }
