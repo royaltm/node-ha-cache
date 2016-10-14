@@ -33,6 +33,16 @@ test('allocVarUIntLE', t => {
   t.deepEquals(Array.from(buf), [0, 0, 1]);
   t.type(buf = varint.allocVarUIntLE(Number.MAX_SAFE_INTEGER), Buffer);
   t.deepEquals(Array.from(buf), [255,255,255,255,255,255,31]);
+  t.type(buf = varint.allocVarUIntLE(0x800000000000), Buffer);
+  t.deepEquals(Array.from(buf), [0,0,0,0,0,128]);
+  t.type(buf = varint.allocVarUIntLE(0x800000000100), Buffer);
+  t.deepEquals(Array.from(buf), [0,1,0,0,0,128]);
+  t.type(buf = varint.allocVarUIntLE(0x800000000001), Buffer);
+  t.deepEquals(Array.from(buf), [1,0,0,0,0,128]);
+  t.type(buf = varint.allocVarUIntLE(0x800000010001), Buffer);
+  t.deepEquals(Array.from(buf), [1,0,1,0,0,128]);
+  t.type(buf = varint.allocVarUIntLE(0x800001000100), Buffer);
+  t.deepEquals(Array.from(buf), [0,1,0,1,0,128]);
   t.throws(() => varint.allocVarUIntLE(Number.MAX_SAFE_INTEGER + 1), new Error("value is above MAX_SAFE_INTEGER"));
   t.end();
 });
@@ -51,6 +61,16 @@ test('writeVarUIntLE', t => {
   t.deepEquals(Array.from(buf), [255,255,0,0,0,0,0,0,0,0]);
   t.strictEquals(varint.writeVarUIntLE(65536, buf), 3);
   t.deepEquals(Array.from(buf), [0,0,1,0,0,0,0,0,0,0]);
+  t.strictEquals(varint.writeVarUIntLE(0x800000000000, buf), 6);
+  t.deepEquals(Array.from(buf), [0,0,0,0,0,128,0,0,0,0]);
+  t.strictEquals(varint.writeVarUIntLE(0x800000000100, buf), 6);
+  t.deepEquals(Array.from(buf), [0,1,0,0,0,128,0,0,0,0]);
+  t.strictEquals(varint.writeVarUIntLE(0x800000000001, buf), 6);
+  t.deepEquals(Array.from(buf), [1,0,0,0,0,128,0,0,0,0]);
+  t.strictEquals(varint.writeVarUIntLE(0x800000010001, buf), 6);
+  t.deepEquals(Array.from(buf), [1,0,1,0,0,128,0,0,0,0]);
+  t.strictEquals(varint.writeVarUIntLE(0x800001000100, buf), 6);
+  t.deepEquals(Array.from(buf), [0,1,0,1,0,128,0,0,0,0]);
   t.strictEquals(varint.writeVarUIntLE(Number.MAX_SAFE_INTEGER, buf), 7);
   t.deepEquals(Array.from(buf), [255,255,255,255,255,255,31,0,0,0]);
   t.throws(() => varint.writeVarUIntLE(Number.MAX_SAFE_INTEGER + 1, buf), new Error("value is above MAX_SAFE_INTEGER"));
@@ -96,6 +116,7 @@ test('readVarUIntLE', t => {
   t.strictEquals(varint.readVarUIntLE(Buffer.from([255,255,255,255,255,255,31])), Number.MAX_SAFE_INTEGER);
   t.strictEquals(varint.readVarUIntLE(Buffer.from([254,255,255,255,255,255,31,0,0,0])), Number.MAX_SAFE_INTEGER - 1);
   t.strictEquals(varint.readVarUIntLE(Buffer.from([255,1,2,3,4,5,6]), 1), 1 + 2*256 + 3*65536 + 4*16777216 + 5*4294967296 + 6*1099511627776);
+  t.strictEquals(varint.readVarUIntLE(Buffer.from([0,0,0,0,0,128])), 0x800000000000);
   t.end();
 });
 
