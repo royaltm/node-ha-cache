@@ -43,7 +43,7 @@ test('allocVarUIntLE', t => {
   t.deepEquals(Array.from(buf), [1,0,1,0,0,128]);
   t.type(buf = varint.allocVarUIntLE(0x800001000100), Buffer);
   t.deepEquals(Array.from(buf), [0,1,0,1,0,128]);
-  t.throws(() => varint.allocVarUIntLE(Number.MAX_SAFE_INTEGER + 1), new Error("value is above MAX_SAFE_INTEGER"));
+  t.throws(() => varint.allocVarUIntLE(Number.MAX_SAFE_INTEGER + 1), new Error("value is above maximum allowed integer"));
   t.end();
 });
 
@@ -73,7 +73,7 @@ test('writeVarUIntLE', t => {
   t.deepEquals(Array.from(buf), [0,1,0,1,0,128,0,0,0,0]);
   t.strictEquals(varint.writeVarUIntLE(Number.MAX_SAFE_INTEGER, buf), 7);
   t.deepEquals(Array.from(buf), [255,255,255,255,255,255,31,0,0,0]);
-  t.throws(() => varint.writeVarUIntLE(Number.MAX_SAFE_INTEGER + 1, buf), new Error("value is above MAX_SAFE_INTEGER"));
+  t.throws(() => varint.writeVarUIntLE(Number.MAX_SAFE_INTEGER + 1, buf), new Error("value is above maximum allowed integer"));
   buf.fill(0);
   t.strictEquals(varint.writeVarUIntLE(1, buf, 9), 10);
   t.deepEquals(Array.from(buf), [0,0,0,0,0,0,0,0,0,1]);

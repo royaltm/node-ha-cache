@@ -16,7 +16,7 @@ test('LevelDownStorage', suite => {
   var storage = new LevelDownStorage('./tmp/db');
 
   suite.test('should get non-existent entry', t => {
-    return storage.get('foo')
+    return storage.get(Buffer.from('foo'))
     .then(value => {
       t.strictEqual(value, null);
       t.end();
@@ -26,10 +26,10 @@ test('LevelDownStorage', suite => {
 
   suite.test('should set entry', t => {
     var entry = {bar: 'baz'}
-    return storage.set('foo', entry)
+    return storage.set(Buffer.from('foo'), entry)
     .then(value => {
       t.strictEqual(value, entry);
-      return storage.get('foo')
+      return storage.get(Buffer.from('foo'))
       .then(value => {
         t.notStrictEqual(value, entry);
         t.deepEqual(value, entry);
@@ -40,10 +40,10 @@ test('LevelDownStorage', suite => {
   .catch(suite.threw);
 
   suite.test('should delete entry', t => {
-    return storage.delete('foo')
+    return storage.delete(Buffer.from('foo'))
     .then(value => {
       t.strictEqual(value, undefined);
-      return storage.get('foo')
+      return storage.get(Buffer.from('foo'))
       .then(value => {
         t.strictEqual(value, null);
         t.end();
