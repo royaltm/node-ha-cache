@@ -1,6 +1,7 @@
 "use strict";
 const assert = require('assert');
 const os = require('os');
+const path = require('path');
 const dns = require('dns');
 const cluster = require('cluster');
 const util = require('util');
@@ -8,7 +9,8 @@ const crypto = require('crypto');
 const colors = require('colors/safe');
 const Cache = require('../lib/cache');
 Cache.StatesMap = require('../lib/emitter_states_map');
-const Storage = require('../lib/storage/test');
+// const Storage = require('../lib/storage/test');
+const Storage = require('../lib/storage/leveldown');
 
 const pid = process.pid;
 
@@ -64,7 +66,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
         peersmap.set(peer.id, peer);
         peerurltoid.set(peer.url, peer.id);
         console.log('forking: %s: %s', peer.id, peer.url);
-        peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi});
+        peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi
+                      , STORAGE: path.resolve(__dirname, '..', 'tmp', peer.id)});
       }, i*initialDelay);
       // freepeers.push(...peers.slice(1));
       // break;
@@ -111,7 +114,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
                 do {
                   let peer = sample(freepeers);
                   console.log('forking: %s: %s', peer.id, peer.url);
-                  peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi});
+                  peer.worker = cluster.fork({URL: peer.url, API: peer.api, BIND_URL: peer.bindUrl, BIND_API: peer.bindApi
+                                , STORAGE: path.resolve(__dirname, '..', 'tmp', peer.id)});
                   peersmap.set(peer.id, peer);
                 } while(count > peersmap.size);
               }
@@ -252,12 +256,15 @@ dns.lookup(os.hostname(), (err, address, family) => {
     // WORKER
     var ident = `${process.env.URL}#${cluster.worker.id}`;
     var cache = new Cache({
+      ttl: 60000,
       peers: peers,
       url: process.env.URL,
       api: process.env.API,
       bindUrl: process.env.BIND_URL,
       bindApi: process.env.BIND_API,
-      storage: {meta: new Storage(), data: new Storage()},
+      storage: { meta: new Storage(path.join(process.env.STORAGE, 'meta'))
+               , data: new Storage(path.join(process.env.STORAGE, 'data'),
+                                   {encoding:false, decoding: false})},
       source: source
     });
     process.send({cache: process.env.URL, worker: cluster.worker.id});
