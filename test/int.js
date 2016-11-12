@@ -264,7 +264,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
       bindApi: process.env.BIND_API,
       storage: { meta: new Storage(path.join(process.env.STORAGE, 'meta'))
                , data: new Storage(path.join(process.env.STORAGE, 'data'),
-                                   {encoding:false, decoding: false})},
+                                   {decode:false, encode:false})},
       source: source
     });
     process.send({cache: process.env.URL, worker: cluster.worker.id});
