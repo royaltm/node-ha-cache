@@ -221,7 +221,10 @@ var server = new Cache({
   url: peers[CURRENT_PEER_INDEX].url,
   api: peers[CURRENT_PEER_INDEX].api,
   peers: peers,
-  storage: new LevelDownStorage("/path/to/persistent/storage"),
+  storage: {
+    meta: new LevelDownStorage("/path/to/persistent/storage/meta"),
+    data: new LevelDownStorage("/path/to/persistent/storage/data", {encode: false, decode: false})
+  },
   source: retrieveEntry,
   bindUrl: "tcp://*:6000", // optional
   bindApi: "tcp://*:6001"  // optional
@@ -250,4 +253,3 @@ client.get("key").then(entry => {
 ### TODO
 
 - some basic security
-- storage: separate values from metadata

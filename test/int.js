@@ -257,7 +257,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
       api: process.env.API,
       bindUrl: process.env.BIND_URL,
       bindApi: process.env.BIND_API,
-      storage: new Storage(),
+      storage: {meta: new Storage(), data: new Storage()},
       source: source
     });
     process.send({cache: process.env.URL, worker: cluster.worker.id});
