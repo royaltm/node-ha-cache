@@ -22,7 +22,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
     for(let i = hostpeers.length; i-- > 0; ) hostpeers[i] = `tcp://${host}:${port + 1000 + i}`;
     peers.push(...hostpeers);
   }
-  var client = new CacheClient(peers, 50000);
+  var client = new CacheClient(peers, {discoveryinterval: -1, timeout: 50000});
   process.stdout.write(peers.map(url => colors.magenta(url)).join("\n") + "\n");
 
   const readline = require('readline');
