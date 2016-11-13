@@ -273,7 +273,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
       cache.close();
     });
     cache.on('statechange', (key, oldstate, newstate) => {
-      process.send({cache: cache.myUrl, text: `statechange: ${key}: ${oldstate} -> ${newstate}`, worker: cluster.worker.id});
+      process.send({cache: cache.url, text: `statechange: ${key}: ${oldstate.toString()} -> ${newstate.toString()}`, worker: cluster.worker.id});
     });
     cache.on('closed', () => {
       process.send({cache: process.env.URL, text: 'closed', worker: cluster.worker.id});
