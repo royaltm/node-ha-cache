@@ -1,6 +1,6 @@
 {
   "name": "node-ha-cache",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "High Availability Distributed JIT Cache",
   "main": "index.js",
   "scripts": {
