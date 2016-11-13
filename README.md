@@ -29,16 +29,19 @@ Implementation
 
 ### Cache
 
-Each cache entry consists of:
+There are two caches: meta and data.
 
-- key
-- data
+Each meta cache entry consists of:
+
+- key {buffer}
 - expire {number}
 - term {number}
+- size {number}
+
 
 ### Messages
 
-Peer-peer messages:
+Peer-2-peer messages:
 
 Every message consists of the following frames:
 
@@ -60,42 +63,42 @@ State types:
 
 data types:
 
-- `key`: binary
+- `key`: buffer
 - `term`: variable unsigned integer LSByte first
 - `expiration`: variable unsigned integer LSByte first
 - `vote`: empty frame: false, on non-zero byte: true
-- `value`: binary
+- `value`: buffer
 
 ### Finite state machine
 
 - state is key scoped
 - state is volatile except term
 
-List of possible states for each key:
+List of possible states:
 
-- "idle": fresh key in storage or default for non-existent entries
-- "follower": has voted for other candidate or follows current sourcing peer
+- `idle`: fresh key in storage or default for non-existent entries
+- `follower`: has voted for other candidate or follows current sourcing peer
   attributes: `term`, `entry`, `peer`, `isSourcing`
-- "candidate": peer candidates for sourcing an entry
+- `candidate`: peer candidates for sourcing an entry
   attributes: `term`, `entry`, `votes`, `aborted`
-- "sourcing": peer is currently retrieving entry from source
+- `sourcing`: peer is currently retrieving entry from source
   attributes: `term`, `entry`
 
 
 #### 1. Timeouts
 
-1.1 state "candidate"
+1.1 state `candidate`
 
-- when number of ANSWERs received is less than majority, enter global partitioned state, drop to "idle" state for a key
+- when number of ANSWERs received is less than majority, enter global partitioned state, drop to `idle` state for a key
 - majority answers received but disagreed, increase term and go ask another QUESTION
 
-1.2 state "follower"
+1.2 state `follower`
 
-- drop back to "idle"
+- drop back to `idle`
 
 1.3 send keep-alive to clients in CLIENT_REQ_REFRESH_INTERVAL intervals
 
-- if state is "idle" send SEEOTHER to clients and drop their requests
+- if state is `idle` send SEEOTHER to clients and drop their requests
 - otherwise send keep-alive to clients awaiting responses
 
 #### 2. on CLIENT REQUEST
@@ -107,25 +110,25 @@ List of possible states for each key:
 - otherwise save request for later and send first keepalive message to client
 - if entry is fresh finish processing.
 
-2.3 state "idle"
+2.3 state `idle`
 
-- set state to "candidate" (random timeout 150 - 300 ms) RPC timeout (100 ms)
+- set state to `candidate` (random timeout 150 - 300 ms) RPC timeout (100 ms)
 - send QUESTION to EVERYONE (repeat question after RPC timeout to peers that we didn't receive ANSWER from)
 
-2.4 state "follower" or "sourcing"
+2.4 state `follower` or `sourcing`
 
 - do nothing
 
 #### 3. on QUESTION
 
-3.1 state "idle"
+3.1 state `idle`
 
 - vote yes if our entry's expiration is not fresh and term in QUESTION >= our entry's term; set follower state with QUESTION sender as peer candidate (300 ms timeout)
 - else vote no
 - update term of our entry if needed
 - always respond with an ANSWER
 
-3.2 state "follower" (we know already we don't have a fresh entry)
+3.2 state `follower` (we know already we don't have a fresh entry)
 
 - vote no if we follow sourcing peer
 - vote yes if the term in QUESTION == our entry's term and our candidate is the same as in the QUESTION
@@ -134,21 +137,21 @@ List of possible states for each key:
 - update term if needed
 - always respond with an ANSWER
 
-3.3 state "candidate"
+3.3 state `candidate`
 
 - if the term in QUESTION <= our entry's term vote no
-- if the term in QUESTION > our entry's term vote yes; convert to "follower" (300 ms timeout) set candidate to the QUESTION sender
+- if the term in QUESTION > our entry's term vote yes; convert to `follower` (300 ms timeout) set candidate to the QUESTION sender
 - update term if needed
 - always respond with ANSWER
 
-3.4 state "sourcing"
+3.4 state `sourcing`
 
 - respond with ANNOUNCEMENT
 
 #### 4. on UPDATE
 
 - if UPDATE expiration > current entry's expiration, save value and expiration from UPDATE
-- if expiration > now (in the future) and state is not "sourcing", drop to idle
+- if expiration > now (in the future) and state is not `sourcing`, drop to idle
 - ipdate entry's term if needed
 - respond to clients.
 
@@ -158,9 +161,9 @@ List of possible states for each key:
 
 5.2 depending on current state
 
-- on state "sourcing", finish processing.
-- on state "follower" with the same peer as sourcing, refresh timeout (2000 ms)
-- otherwise if ANNOUNCEMENT's term >= our entry's, or state is "idle", set state to "follower", set peer, set isSourcing to true, timeout (2000 ms)
+- on state `sourcing`, finish processing.
+- on state `follower` with the same peer as sourcing, refresh timeout (2000 ms)
+- otherwise if ANNOUNCEMENT's term >= our entry's, or state is `idle`, set state to `follower`, set peer, set isSourcing to true, timeout (2000 ms)
 - update term if needed
 
 
@@ -170,14 +173,14 @@ List of possible states for each key:
 
 #### 7. on ANSWER
 
-7.1 state "candidate"
+7.1 state `candidate`
 
 - if ANSWER's expiration > now send ENTRYREQ to the ANSWER's sender, update term if needed, abort current voting and set new timeout (150 - 300 ms)
 - if ANSWER's term < ours, do not check vote (but count vote toward network partitioning check), finish processing
 - otherwise if ANSWER's term > ours, update our term, abort current voting and let it timeout to go with another election, finish processing
-- otherwise check vote if majority agreed convert to "sourcing", start sourcing, start sending ANNOUNCEMENTs (on 1000ms interval)
+- otherwise check vote if majority agreed convert to `sourcing`, start sourcing, start sending ANNOUNCEMENTs (on 1000ms interval)
 
-7.2 state "follower" or "idle" or "sourcing" finish processing.
+7.2 state `follower` or `idle` or `sourcing` finish processing.
 
 #### 8. on PING
 
