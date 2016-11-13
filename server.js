@@ -4,5 +4,5 @@
  */
 "use strict";
 
-exports.StatesMapEmitter = require('./lib/emitter_states_map');
+exports.StatesMapEmitter = require('./lib/states_map_emitter');
 exports.Cache = require('./lib/cache');

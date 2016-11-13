@@ -8,7 +8,7 @@ const util = require('util');
 const crypto = require('crypto');
 const colors = require('colors/safe');
 const Cache = require('../lib/cache');
-Cache.StatesMap = require('../lib/emitter_states_map');
+const StatesMapEmitter = require('../lib/states_map_emitter');
 // const Storage = require('../lib/storage/test');
 const Storage = require('../lib/storage/leveldown');
 
@@ -266,7 +266,8 @@ dns.lookup(os.hostname(), (err, address, family) => {
       storage: { meta: new Storage(path.join(process.env.STORAGE, 'meta'))
                , data: new Storage(path.join(process.env.STORAGE, 'data'),
                                    {decode:false, encode:false})},
-      source: source
+      source: source,
+      statesMapClass: StatesMapEmitter
     });
     process.send({cache: process.env.URL, worker: cluster.worker.id});
     cache.on('error', err => {
