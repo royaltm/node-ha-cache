@@ -37,14 +37,15 @@ dns.lookup(os.hostname(), (err, address, family) => {
 
   function ask() {
     rl.question(colors.grey('> '), (cmd) => {
-      var [key, times] = cmd.trim().split(/\s+/, 2);
+      var [key, times, fresh] = cmd.trim().split(/\s+/, 3);
 
       if (!key) return process.exit(0);
       else {
-        console.log('key: %s', key);
         times = (times >>> 0) || 1;
+        let after = fresh === 'now' ? Date.now() : 0;
+        console.log('key: %s times: %d after: %d', key, times, after);
         while(times-- > 0) {
-          client.get(key).then(entry => {
+          client.get(key, after).then(entry => {
             console.log('got: "%s" data: %d exp: %d', key, entry.value.length, entry.expire);
           })
           .catch(err => {
