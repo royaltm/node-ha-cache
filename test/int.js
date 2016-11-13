@@ -269,7 +269,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
     });
     process.send({cache: process.env.URL, worker: cluster.worker.id});
     cache.on('error', err => {
-      process.send({worker: cluster.worker.id, cache: cache.myUrl, error: err.stack});
+      process.send({worker: cluster.worker.id, cache: cache.url, error: err.stack});
       cache.close();
     });
     cache.on('statechange', (key, oldstate, newstate) => {
@@ -285,12 +285,12 @@ dns.lookup(os.hostname(), (err, address, family) => {
         cache = null;
       } else if (msg === 'status') {
         let text = Array.from(cache._states.values()).map(s => `(${s.keystr} :- ${s.type})`).join(',');
-        process.send({cache: cache.myUrl, worker: cluster.worker.id, text: text});
+        process.send({cache: cache.url, worker: cluster.worker.id, text: text});
       } else if (msg.substr(0, 12) === 'unsubscribe:') {
         let url = msg.substr(12);
         for(let peer of cache.peerUrls) {
           if (peer === url) {
-            process.send({cache: cache.myUrl, worker: cluster.worker.id, text: ident + ' unsubscribing: ' + url});
+            process.send({cache: cache.url, worker: cluster.worker.id, text: ident + ' unsubscribing: ' + url});
             cache.incoming.unsubscribe(url);
             break;
           }
@@ -299,7 +299,7 @@ dns.lookup(os.hostname(), (err, address, family) => {
         let url = msg.substr(10);
         for(let peer of cache.peerUrls) {
           if (peer === url) {
-            process.send({cache: cache.myUrl, worker: cluster.worker.id, text: ident + ' subscribing: ' + url});
+            process.send({cache: cache.url, worker: cluster.worker.id, text: ident + ' subscribing: ' + url});
             cache.incoming.subscribe(url);
             break;
           }
